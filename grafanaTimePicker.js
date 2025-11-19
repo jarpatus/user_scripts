@@ -1,34 +1,35 @@
 // ==UserScript==
-// @name        Grafana Custom Time Picker
+// @name        Grafana Custom Time Span Navigator
 // @namespace   Violentmonkey Scripts
 // @match       https://grafana/*
 // @grant       none
-// @version     1.0
+// @version     0.1
 // @author      Jari Eskelinen <jari.eskelinen@iki.fi>
-// @description 11/18/2025, 10:37:38 PM
+// @description Quick'n'dirty custom time span navigator for Grafana operating like humans expect. YMMV.
+// @require		https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js
+// @require		https://cdn.jsdelivr.net/npm/dayjs@1/plugin/localizedFormat.js
+// @require		https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js
+// @require		https://cdn.jsdelivr.net/npm/dayjs@1/locale/fi.js
+
 // ==/UserScript==
 
 (function () {
     "use strict";
 
-    class _datePicker {
-        constructor(locale) {
-            this.locale = locale || navigator.language || navigator.userLanguage;
+    // Specify locale, also change @require tag above to include selected locale
+    let locale = 'fi';
+
+    class GrafanaCustomTimeSpanNavigator {
+
+        constructor() {
             this.multiplier = 1;
             this.unit = "d";
-            this.startDt = new Date();
-            this.startDt.setHours(0);
-            this.startDt.setMinutes(0);
-            this.startDt.setSeconds(0);
-            this.startDt.setMilliseconds(0);
-            this.endDt = new Date(this.startDt);
-            this.endDt.setDate(this.endDt.getDate() + 1);
-            this.endDt.setSeconds(this.endDt.getSeconds() - 1);
-            this.endDt.setMilliseconds(999);
+            this.startDt = dayjs().hour(0).minute(0).second(0).millisecond(0);
+            this.endDt = dayjs(this.startDt).add(1, 'd').add(-1, 's').millisecond(999);
         }
 
         onMultiplierChange(e) {
-            var newValue = parseInt(e.target.value);
+            let newValue = parseInt(e.target.value);
             if (isNaN(newValue)) {
                 alert("Unable to parse: " + e.target.value);
             } else {
@@ -41,8 +42,8 @@
         }
 
         onStartChange(e) {
-            var newValue = new Date(e.target.value);
-            if (isNaN(newValue.valueOf())) {
+            let newValue = dayjs(e.target.value, 'L LTS');
+            if (!newValue.isValid()) {
                 alert("Unable to parse: " + e.target.value);
             } else {
                 this.startDt = newValue;
@@ -51,8 +52,8 @@
         }
 
         onEndChange(e) {
-            var newValue = new Date(e.target.value);
-            if (isNaN(newValue.valueOf())) {
+            let newValue = dayjs(e.target.value, 'L LTS');
+            if (!newValue.isValid()) {
                 alert("Unable to parse: " + e.target.value);
             } else {
                 this.endDt = newValue;
@@ -61,53 +62,36 @@
         }
 
         onPrev() {
-            this.adjustRange(this.startDt, -this.multiplier);
-            this.adjustRange(this.endDt, -this.multiplier);
-        }
-
-        onNext() {
-            this.adjustRange(this.startDt, this.multiplier);
-            this.adjustRange(this.endDt, this.multiplier);
-        }
-
-        adjustRange(dt, m) {
-            if (this.unit == "s") this.addTime(dt, m, 0, 0, 0, 0, 0);
-            else if (this.unit == "M") this.addTime(dt, 0, m, 0, 0, 0, 0);
-            else if (this.unit == "H") this.addTime(dt, 0, 0, m, 0, 0, 0);
-            else if (this.unit == "d") this.addTime(dt, 0, 0, 0, m, 0, 0);
-            else if (this.unit == "m") this.addTime(dt, 0, 0, 0, 0, m, 0);
-            else if (this.unit == "y") this.addTime(dt, 0, 0, 0, 0, 0, m);
-            this.updatePicker();
+            this.startDt = this.startDt.add(-this.multiplier, this.unit);
+            this.endDt = this.endDt.add(-this.multiplier, this.unit);
+            this.updateNavigator();
             this.updateSpa();
         }
 
-        addTime(dt, s, M, H, d, m, y) {
-            if (s) dt.setSeconds(dt.getSeconds() + s);
-            if (M) dt.setMinutes(dt.getMinutes() + M);
-            if (H) dt.setHours(dt.getHours() + H);
-            if (d) dt.setDate(dt.getDate() + d);
-            if (m) dt.setMonth(dt.getMonth() + m);
-            if (y) dt.setFullYear(dt.getFullYear() + y);
+        onNext() {
+            this.startDt = this.startDt.add(this.multiplier, this.unit);
+            this.endDt = this.endDt.add(this.multiplier, this.unit);
+            this.updateNavigator();
+            this.updateSpa();
         }
 
-        injectPicker() {
-            var inputStyle =
-                "height: 100%; padding: 0px 8px; background-color: #24252b; line-height: 1.57143; font-size: 14px; color: rgb(204, 204, 220); border: 1px solid rgba(204, 204, 220, 0.2);";
-            var buttonStyle = inputStyle;
-            this.domOobPicker = $('[data-testid="data-testid dashboard controls"]');
+        injectNavigator() {
+            let inputStyle = "height: 100%; padding: 0px 8px; background-color: #24252b; line-height: 1.57143; font-size: 14px; color: rgb(204, 204, 220); border: 1px solid rgba(204, 204, 220, 0.2);";
+            let buttonStyle = inputStyle;
+            this.domOobNavigator = $('[data-testid="data-testid dashboard controls"]');
             this.domStart = $(`<input style="${inputStyle}" type="text"/>`);
-            this.domEnd = $(`<input style="${inputStyle}" type="text"/>`);
+            this.domEnd = $(`<input style="margin-left: 1em; ${inputStyle}" type="text"/>`);
             this.domPrev = $(`<button style="margin-left: 1em; ${buttonStyle}">&lt;</button>`);
             this.domMultiplier = $(`<input style="width: 2em; ${inputStyle}" type="text"/>`);
             this.domUnit = $(`
-        <select style="height: 100%; width: 6em; ${inputStyle}">
-          <option value="s">seconds</option>
-          <option value="M">minutes</option>
-          <option value="H">hours</option>
-          <option value="d">days</option>
-          <option value="m">months</option>
-          <option value="y">years</option>
-        </select>`);
+              <select style="height: 100%; width: 6em; ${inputStyle}">
+                <option value="s">seconds</option>
+                <option value="m">minutes</option>
+                <option value="h">hours</option>
+                <option value="d">days</option>
+                <option value="M">months</option>
+                <option value="y">years</option>
+              </select>`);
             this.domNext = $(`<button style="${buttonStyle}">&gt;</button>`);
             this.domMultiplier.on("change", this.onMultiplierChange.bind(this));
             this.domUnit.on("change", this.onUnitChange.bind(this));
@@ -116,7 +100,7 @@
             this.domPrev.on("click", this.onPrev.bind(this));
             this.domNext.on("click", this.onNext.bind(this));
             this.domWrapper = $(
-                '<div style="height: 2em; float: right; margin-right: 2em; margin-bottom: 1em;" id="grafana-custom-time-picker"/>'
+                '<div style="height: 2em; float: right; margin-right: 2em; margin-bottom: 1em;" id="grafana-Custom-time-Navigator"/>'
             );
             this.domWrapper.append(
                 this.domStart,
@@ -126,19 +110,19 @@
                 this.domUnit,
                 this.domNext
             );
-            this.domOobPicker.after(this.domWrapper);
-            this.updatePicker();
+            this.domOobNavigator.after(this.domWrapper);
+            this.updateNavigator();
         }
 
-        updatePicker() {
+        updateNavigator() {
             this.domMultiplier.val(this.multiplier);
             this.domUnit.val(this.unit);
-            this.domStart.val(this.startDt.toLocaleString(this.locale));
-            this.domEnd.val(this.endDt.toLocaleString(this.locale));
+            this.domStart.val(this.startDt.format('L LTS'));
+            this.domEnd.val(this.endDt.format('L LTS'));
         }
 
         updateSpa() {
-            var url = new URL(window.location.href);
+            let url = new URL(window.location.href);
             url.searchParams.set("from", this.startDt.toISOString());
             url.searchParams.set("to", this.endDt.toISOString());
             history.pushState({}, "", url.toString());
@@ -146,15 +130,22 @@
         }
     }
 
-    const observer = new MutationObserver((mutations, obs) => {
-        if (
-            $('[data-testid="data-testid dashboard controls"]').length > 0 &&
-            $("#grafana-custom-time-picker").length <= 0
-        ) {
-            window._datePicker.injectPicker();
-        }
-    });
+    // Initialize Day.js
+    dayjs.extend(window.dayjs_plugin_localizedFormat);
+    dayjs.extend(window.dayjs_plugin_customParseFormat);
+    dayjs.locale(locale);
 
-    window._datePicker = new _datePicker("fi-FI");
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Create Time Span Navigator instance
+    window.grafanaCustomTimeSpanNavigator = new GrafanaCustomTimeSpanNavigator();
+
+    // Create observer for injecting Time Span Navigator
+    let throttle = null;
+    new MutationObserver((mutations, obs) => {
+		if (!throttle) throttle = window.setTimeout(function(){
+			if ($('[data-testid="data-testid dashboard controls"]').length > 0 && $("#grafana-Custom-time-Navigator").length <= 0)
+				window.grafanaCustomTimeSpanNavigator.injectNavigator();
+			throttle = null;
+		}, 1000);
+    }).observe(document.body, {childList: true, subtree: true});
+
 })();
