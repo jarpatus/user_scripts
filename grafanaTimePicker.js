@@ -100,7 +100,7 @@
             this.domPrev.on("click", this.onPrev.bind(this));
             this.domNext.on("click", this.onNext.bind(this));
             this.domWrapper = $(
-                '<div style="height: 2em; float: right; margin-right: 2em; margin-bottom: 1em;" id="grafana-Custom-time-Navigator"/>'
+                '<div style="height: 32px; float: right; margin-right: 24px; margin-bottom: 1em;" id="grafana-Custom-time-Navigator"/>'
             );
             this.domWrapper.append(
                 this.domStart,
@@ -110,6 +110,7 @@
                 this.domUnit,
                 this.domNext
             );
+            //this.domOobNavigator.hide();
             this.domOobNavigator.after(this.domWrapper);
             this.updateNavigator();
         }
